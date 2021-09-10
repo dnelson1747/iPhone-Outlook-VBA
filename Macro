@@ -1,0 +1,67 @@
+Sub TurnEmebeddedImagestoAttachments()
+    Dim objMail As Outlook.MailItem
+    Dim objAttachments As Outlook.Attachments
+    Dim objAttachment As Outlook.Attachment
+    Dim objFileSystem As Object
+    Dim strTempFolder As String
+    Dim strFile As String
+    Dim i As Long
+    Dim strTempFolder2 As String
+ 
+    Select Case Outlook.Application.ActiveWindow.Class
+           Case olInspector
+                Set objMail = ActiveInspector.CurrentItem
+           Case olExplorer
+                Set objMail = Application.ActiveExplorer.Selection.Item(1)
+    End Select
+
+    Set objAttachments = objMail.Attachments
+ 
+    'Create a temp folder
+    Set objFileSystem = CreateObject("Scripting.FileSystemObject")
+    strTempFolder = objFileSystem.GetSpecialFolder(2).Path & "\Temp " & Format(Now, "YYYY-MM-DD hh-mm-ss")
+    MkDir (strTempFolder)
+ 
+    'Save all embedded images to temp folder
+    For i = objAttachments.Count To 1 Step -1
+        Set objAttachment = objAttachments.Item(i)
+        If IsEmbedded(objAttachment) = True Then
+           objAttachment.SaveAsFile strTempFolder & "\" & objAttachment.FileName
+        End If
+    Next
+ 
+    'Add extracted images as attachments
+    strTempFolder2 = strTempFolder & "\"
+    strFile = Dir(strTempFolder2)
+ 
+    While Len(strFile) > 0
+          objMail.Attachments.Add (strTempFolder2 & strFile)
+          strFile = Dir
+    Wend
+ 
+    'Remove embedded images from message body
+    With objMail
+        .BodyFormat = olFormatPlain
+    End With
+    
+    'Deletes temp folder and jpeg
+    Dim fso
+    Application.Wait Now + TimeValue("0:00:02")
+    Set fso = CreateObject("Scripting.FileSystemObject")
+    fso.deletefolder strTempFolder
+    
+End Sub
+
+Function IsEmbedded(objCurAttachment As Outlook.Attachment) As Boolean
+    Dim objPropertyAccessor As Outlook.PropertyAccessor
+    Dim strProperty As String
+ 
+    Set objPropertyAccessor = objCurAttachment.PropertyAccessor
+    strProperty = objPropertyAccessor.GetProperty("http://schemas.microsoft.com/mapi/proptag/0x3712001E")
+ 
+    If InStr(1, strProperty, "@") > 0 Then
+       IsEmbedded = True
+    Else
+       IsEmbedded = False
+    End If
+End Function
